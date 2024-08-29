@@ -1742,6 +1742,7 @@ class KubernetesExecutor(ClusterExecutor):
         container_image=None,
         k8s_cpu_scalar=1.0,
         k8s_service_account_name=None,
+        k8s_persistent_volumes=None,
         jobname="{rulename}.{jobid}",
         printreason=False,
         quiet=False,
@@ -1778,12 +1779,17 @@ class KubernetesExecutor(ClusterExecutor):
                 "The Python 3 package 'kubernetes' "
                 "must be installed to use Kubernetes"
             )
-        config.load_kube_config()
+        
+        try:
+            config.load_kube_config()
+        except Exception as e:
+            config.load_incluster_config()
 
         import kubernetes.client
 
         self.k8s_cpu_scalar = k8s_cpu_scalar
         self.k8s_service_account_name = k8s_service_account_name
+        self.k8s_persistent_volumes = k8s_persistent_volumes
         self.kubeapi = kubernetes.client.CoreV1Api()
         self.batchapi = kubernetes.client.BatchV1Api()
         self.namespace = namespace
@@ -1797,6 +1803,26 @@ class KubernetesExecutor(ClusterExecutor):
 
     def get_job_exec_prefix(self, job: ExecutorJobInterface):
         return "cp -rf /source/. ."
+
+    def get_persistent_volumes(self):
+        """
+        Inspects self.k8s_persistent_volumes of form volume:mountPath,volume:mountPath and 
+        returns a list of dictionaries with keys 'volume' and 'mountPath'
+        returns an empty list if self.k8s_persistent_volumes is None or doesn't match the pattern
+        """
+        if self.k8s_persistent_volumes:
+            volumes = []
+            for volume in self.k8s_persistent_volumes.split(","):
+                parts = volume.split(":")
+                if len(parts) != 2:
+                    logger.error(
+                        "Invalid persistent volume specification: {}".format(volume)
+                    )
+                    return []
+                volumes.append({"volume": parts[0], "mountPath": parts[1]})
+            return volumes
+        return []
+
 
     def register_secret(self):
         import kubernetes.client
@@ -1959,6 +1985,12 @@ class KubernetesExecutor(ClusterExecutor):
             kubernetes.client.V1VolumeMount(name="workdir", mount_path="/workdir"),
             kubernetes.client.V1VolumeMount(name="source", mount_path="/source"),
         ]
+        for volume in self.get_persistent_volumes():
+            container.volume_mounts.append(
+                kubernetes.client.V1VolumeMount(
+                    name=volume["volume"], mount_path=volume["mountPath"]
+                )
+            )
 
         node_selector = {}
         if "machine_type" in job.resources.keys():
@@ -2004,6 +2036,14 @@ class KubernetesExecutor(ClusterExecutor):
         workdir_volume = kubernetes.client.V1Volume(name="workdir")
         workdir_volume.empty_dir = kubernetes.client.V1EmptyDirVolumeSource()
         body.spec.volumes = [secret_volume, workdir_volume]
+
+        # Add persistent volumes
+        for volume in self.get_persistent_volumes():
+            pv = kubernetes.client.V1Volume(name=volume["volume"])
+            pv.persistent_volume_claim = kubernetes.client.V1PersistentVolumeClaimVolumeSource(
+                claim_name=volume["volume"]
+            )
+            body.spec.volumes.append(pv)
 
         # env vars
         container.env = []

@@ -181,6 +181,7 @@ def snakemake(
     container_image=None,
     k8s_cpu_scalar=1.0,
     k8s_service_account_name=None,
+    k8s_persistent_volumes=None,
     flux=False,
     tibanna=False,
     tibanna_sfn=None,
@@ -326,6 +327,7 @@ def snakemake(
         container_image (str):      Docker image to use, e.g., for Kubernetes.
         k8s_cpu_scalar (float):     What proportion of each k8s node's CPUs are availabe to snakemake?
         k8s_service_account_name (str): Custom k8s service account, needed for workload identity.
+        k8s_persistent_volumes (str): Persistent volumes to mount in the k8s pods. Format: "volume_name:/path/in/container,other_volume:/other_path"
         flux (bool):                Launch workflow to flux cluster.
         default_remote_provider (str): default remote provider to use instead of local files (e.g. S3, GS)
         default_remote_prefix (str): prefix for default remote provider (e.g. name of the bucket).
@@ -755,6 +757,7 @@ def snakemake(
                     container_image=container_image,
                     k8s_cpu_scalar=k8s_cpu_scalar,
                     k8s_service_account_name=k8s_service_account_name,
+                    k8s_persistent_volumes=k8s_persistent_volumes,
                     conda_create_envs_only=conda_create_envs_only,
                     default_remote_provider=default_remote_provider,
                     default_remote_prefix=default_remote_prefix,
@@ -822,6 +825,7 @@ def snakemake(
                     container_image=container_image,
                     k8s_cpu_scalar=k8s_cpu_scalar,
                     k8s_service_account_name=k8s_service_account_name,
+                    k8s_persistent_volumes=k8s_persistent_volumes,
                     tibanna=tibanna,
                     tibanna_sfn=tibanna_sfn,
                     az_batch=az_batch,
@@ -2485,6 +2489,13 @@ def get_argument_parser(profiles=None):
         "when using Google Cloud GKE Autopilot.",
     )
 
+    group_kubernetes.add_argument(
+        "--k8s-persistent-volumes",
+        metavar="PERSISTENTVOLUMES",
+        default=None,
+        help="This argument allows mounts persistent volumes in kubernetes pods. Format is volume_name:/path/to/mount,other_volume:/other_path "
+    )
+
     group_tibanna.add_argument(
         "--tibanna",
         action="store_true",
@@ -3196,6 +3207,7 @@ def main(argv=None):
             container_image=args.container_image,
             k8s_cpu_scalar=args.k8s_cpu_scalar,
             k8s_service_account_name=args.k8s_service_account_name,
+            k8s_persistent_volumes=args.k8s_persistent_volumes,
             flux=args.flux,
             tibanna=args.tibanna,
             tibanna_sfn=args.tibanna_sfn,
