@@ -2073,7 +2073,7 @@ class KubernetesExecutor(ClusterExecutor):
         logger.debug(f"k8s pod resources: {container.resources.requests}")
 
         # capabilities
-        if job.needs_singularity and self.workflow.use_singularity:
+        # if job.needs_singularity and self.workflow.use_singularity:
             # TODO this should work, but it doesn't currently because of
             # missing loop devices
             # singularity inside docker requires SYS_ADMIN capabilities
@@ -2085,10 +2085,12 @@ class KubernetesExecutor(ClusterExecutor):
             #                               "SETGID",
             #                               "SYS_CHROOT"]
 
-            # Running in priviledged mode always works
-            container.security_context = kubernetes.client.V1SecurityContext(
-                privileged=True
-            )
+
+        # Running in priviledged mode always works
+        # Run all containers in privileged mode
+        container.security_context = kubernetes.client.V1SecurityContext(
+            privileged=True
+        )
 
         pod = self._kubernetes_retry(
             lambda: self.kubeapi.create_namespaced_pod(self.namespace, body)
