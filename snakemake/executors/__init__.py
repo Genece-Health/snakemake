@@ -1974,6 +1974,9 @@ class KubernetesExecutor(ClusterExecutor):
         body.metadata = kubernetes.client.V1ObjectMeta(labels={"app": "snakemake"})
 
         body.metadata.name = jobid
+        body.metadata.annotations = {
+            "cluster-autoscaler.kubernetes.io/safe-to-evict": "false"
+        }
 
         # container
         container = kubernetes.client.V1Container(name=jobid)
